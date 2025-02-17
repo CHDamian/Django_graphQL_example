@@ -12,7 +12,7 @@ class Event(models.Model):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     source = models.CharField(max_length=255, choices=EVENT_SOURCES)
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)
-    description = models.TextField()
+    updated_at = models.DateTimeField(null=True, blank=True)
+    description = models.TextField(null=True, blank=True)
     
 
