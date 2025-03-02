@@ -4,6 +4,7 @@ import graphene
 from .models import Event
 from django.db import models
 from django_filters import FilterSet, OrderingFilter
+import producers.kafka_producer as Producer
 
 class EventType(DjangoObjectType):
     class Meta:
@@ -25,6 +26,28 @@ class CreateEvent(graphene.Mutation):
             raise ValueError("Unknown source!")
         event = Event.objects.create(name=name, source=source, description=description)
         return CreateEvent(event=event)
+    
+class CreateEventAsync(graphene.Mutation):
+    class Arguments:
+        name = graphene.String(required=True)
+        source = graphene.String(required=True)
+        description = graphene.String()
+
+    success = graphene.Boolean()
+    details = graphene.String()
+
+    def mutate(self, info, name, source, description=None):
+        if source not in dict(Event.EVENT_SOURCES):
+            return CreateEventAsync(success=False, details="Unknown source!")
+
+        event_data = {
+            "name": name,
+            "source": source,
+            "description": description or "",
+        }
+        Producer.send_event(event_data)
+
+        return CreateEventAsync(success=True, details="")
     
 
 class UpdateEvent(graphene.Mutation):
@@ -84,5 +107,6 @@ class Query(graphene.ObjectType):
 
 class Mutation(graphene.ObjectType):
     create_event = CreateEvent.Field()
+    create_event_async = CreateEventAsync.Field()
     update_event = UpdateEvent.Field()
     delete_event = DeleteEvent.Field()

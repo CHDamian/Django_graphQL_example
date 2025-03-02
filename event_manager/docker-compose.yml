@@ -1,0 +1,63 @@
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.0.1
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.0.1
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "29092:29092"
+      - "9092:9092"
+      - "9101:9101"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_JMX_PORT: 9101
+      KAFKA_JMX_HOSTNAME: localhost
+    restart: on-failure
+
+  django:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: django
+    depends_on:
+      - kafka
+    volumes:
+      - .:/app:z
+    environment:
+      DJANGO_SETTINGS_MODULE: event_manager.settings
+      SECRET_KEY: "super-secret-key"
+    ports:
+      - "8000:8000"
+    command: ["sh", "-c", "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"]
+
+
+  faust_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: faust_worker
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_BROKER_URL: kafka:9092
+    volumes:
+      - .:/app
+    command: ["sh", "-c", "faust -A consumers.faust_consumer worker --loglevel=info"]
+    restart: always
