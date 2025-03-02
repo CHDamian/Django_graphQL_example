@@ -1,1 +1,3 @@
 # Django_graphQL_example
+
+to be added...
